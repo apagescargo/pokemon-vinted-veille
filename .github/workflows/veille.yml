@@ -1,10 +1,12 @@
 name: Veille Pokémon Vinted
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"    # toutes les 5 minutes
-    - cron: "0 * * * *"      # rapport horaire (à heure pile)
-  workflow_dispatch:          # lancement manuel possible depuis GitHub
+  workflow_dispatch:
+    inputs:
+      rapport_horaire:
+        description: "Envoyer le rapport horaire Discord"
+        required: false
+        default: "false"
 
 jobs:
   scan:
@@ -26,5 +28,5 @@ jobs:
           SEUIL_MAX:           "0.04"
           MIN_CARTES:          "300"
           ANCIENNETE_MINUTES:  "60"
-          RAPPORT_HORAIRE:     ${{ github.event.schedule == '0 * * * *' && 'true' || 'false' }}
+          RAPPORT_HORAIRE:     ${{ github.event.inputs.rapport_horaire || 'false' }}
         run: python veille.py
