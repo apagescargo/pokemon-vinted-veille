@@ -181,6 +181,25 @@ def anciennete(ts) -> str:
     except Exception:
         return "date inconnue"
 
+def envoyer_rapport(total_analyses: int, trouves: int):
+    if not DISCORD_WEBHOOK_URL:
+        return
+    heure = datetime.now(timezone.utc).strftime("%H:%M UTC")
+    embed = {
+        "title": "📊 Rapport horaire — Veille Pokémon",
+        "color": 0x5865f2,
+        "fields": [
+            {"name": "🔍 Annonces analysées", "value": str(total_analyses), "inline": True},
+            {"name": "✅ Affaires trouvées",   "value": str(trouves),        "inline": True},
+            {"name": "⚙️ Critères",            "value": f"≥{MIN_CARTES} cartes · ≤{SEUIL_MAX}€/carte", "inline": False},
+            {"name": "🕐 Heure",               "value": heure,               "inline": True},
+        ],
+    }
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]}, timeout=8)
+    except Exception:
+        pass
+
 def envoyer_discord(r: dict) -> bool:
     if not DISCORD_WEBHOOK_URL:
         return False
@@ -205,11 +224,13 @@ def envoyer_discord(r: dict) -> bool:
 # ── Scan principal ─────────────────────────────────────────────────────────────
 
 def scan():
-    blacklist     = load_blacklist()
-    deja_notifies = blacklist.copy()
-    maintenant    = datetime.now(timezone.utc)
-    limite        = timedelta(minutes=ANCIENNETE_MINUTES) if ANCIENNETE_MINUTES > 0 else None
-    trouves       = 0
+    blacklist        = load_blacklist()
+    deja_notifies    = blacklist.copy()
+    maintenant       = datetime.now(timezone.utc)
+    limite           = timedelta(minutes=ANCIENNETE_MINUTES) if ANCIENNETE_MINUTES > 0 else None
+    trouves          = 0
+    total_analyses   = 0
+    rapport_horaire  = os.getenv("RAPPORT_HORAIRE", "false").lower() == "true"
 
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Démarrage scan — {len(MOTS_CLES)} mots-clés | seuil={SEUIL_MAX}€ | min={MIN_CARTES} cartes | ancienneté={ANCIENNETE_MINUTES}min")
 
@@ -231,6 +252,8 @@ def scan():
                 continue
             a_analyser.append(a)
 
+        nonlocal total_analyses
+        total_analyses += len(a_analyser)
         futures = {_EXECUTOR_ITEMS.submit(analyser_item, a["titre"], a["id"], a["prix"]): a for a in a_analyser}
         resultats = []
         for fut in as_completed(futures):
@@ -260,7 +283,9 @@ def scan():
                 with _NOTIFY_LOCK:
                     deja_notifies.discard(r["id"])
 
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Scan terminé — {trouves} affaire(s) envoyée(s)")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Scan terminé — {trouves} affaire(s) envoyée(s) | {total_analyses} annonces analysées")
+    if rapport_horaire:
+        envoyer_rapport(total_analyses, trouves)
 
 if __name__ == "__main__":
     scan()
