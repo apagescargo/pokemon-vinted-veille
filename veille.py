@@ -9,16 +9,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 
-# ── Config depuis variables d'environnement ────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────────────────────
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 BLACKLIST_FILE      = os.path.join(os.path.dirname(__file__), "blacklist.json")
 
-MOTS_CLES   = [q.strip() for q in os.getenv("MOTS_CLES", "gros lot cartes pokemon,lot vrac pokemon,collection pokemon,pokemon,lot cartes pokemon,reverses pokemon").split(",") if q.strip()]
-MOTS_EXCLUS = [m.strip().lower() for m in os.getenv("MOTS_EXCLUS", "").split(",") if m.strip()]
-SEUIL_MAX   = float(os.getenv("SEUIL_MAX", "0.04"))
-MIN_CARTES  = int(os.getenv("MIN_CARTES", "300"))
+MOTS_CLES          = [q.strip() for q in os.getenv("MOTS_CLES", "gros lot cartes pokemon,lot vrac pokemon,collection pokemon,pokemon,lot cartes pokemon,reverses pokemon").split(",") if q.strip()]
+MOTS_EXCLUS        = [m.strip().lower() for m in os.getenv("MOTS_EXCLUS", "").split(",") if m.strip()]
+SEUIL_MAX          = float(os.getenv("SEUIL_MAX", "0.04"))
+MIN_CARTES         = int(os.getenv("MIN_CARTES", "300"))
 ANCIENNETE_MINUTES = int(os.getenv("ANCIENNETE_MINUTES", "60"))
+RAPPORT_HORAIRE    = os.getenv("RAPPORT_HORAIRE", "false").lower() == "true"
 
 VINTED_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -34,6 +35,7 @@ VINTED_HEADERS = {
 
 _thread_local     = threading.local()
 _NOTIFY_LOCK      = threading.Lock()
+_COUNTER_LOCK     = threading.Lock()
 _EXECUTOR_QUERIES = ThreadPoolExecutor(max_workers=6)
 _EXECUTOR_ITEMS   = ThreadPoolExecutor(max_workers=32)
 
@@ -80,7 +82,7 @@ def save_blacklist(bl: set):
 
 # ── Scraping ───────────────────────────────────────────────────────────────────
 
-def scrape_page(query: str, page: int) -> tuple[list[dict], int]:
+def scrape_page(query: str, page: int) -> list[dict]:
     try:
         resp = get_session().get(
             "https://www.vinted.fr/api/v2/catalog/items",
@@ -90,43 +92,39 @@ def scrape_page(query: str, page: int) -> tuple[list[dict], int]:
         resp.raise_for_status()
         data = resp.json()
     except Exception:
-        return [], 0
+        return []
 
-    total_pages = data.get("pagination", {}).get("total_pages", 1)
     items = []
     for item in data.get("items", []):
-        photos     = item.get("photos", [])
-        photo_url  = photos[0].get("url", "") if photos else ""
-        created_at = photos[0].get("high_resolution", {}).get("timestamp") if photos else None
-        price      = item.get("price", 0)
+        photos    = item.get("photos", [])
+        price     = item.get("price", 0)
         items.append({
-            "id":         item.get("id"),
+            "id":         item["id"],
             "titre":      item.get("title", ""),
             "titre_low":  item.get("title", "").lower(),
             "prix":       float(price.get("amount", 0) if isinstance(price, dict) else price),
-            "url":        f"https://www.vinted.fr/items/{item.get('id')}",
-            "photo":      photo_url,
-            "created_at": created_at,
+            "url":        f"https://www.vinted.fr/items/{item['id']}",
+            "photo":      photos[0].get("url", "") if photos else "",
+            "created_at": photos[0].get("high_resolution", {}).get("timestamp") if photos else None,
         })
-    return items, total_pages
+    return items
 
 def scrape_all_pages(query: str) -> list[dict]:
-    futures = {_EXECUTOR_ITEMS.submit(scrape_page, query, p): p for p in range(1, 11)}
+    futures  = [_EXECUTOR_ITEMS.submit(scrape_page, query, p) for p in range(1, 11)]
     all_items = []
     for fut in as_completed(futures):
-        items, _ = fut.result()
-        all_items.extend(items)
+        all_items.extend(fut.result())
     return all_items
 
 # ── Analyse ────────────────────────────────────────────────────────────────────
 
-def _regex(texte: str) -> int:
+def _count_cards(texte: str) -> int:
     t = _CARD_REF.sub("", texte)
     for pat in _PATTERNS:
         m = pat.search(t)
         if m:
             val = int(m.group(1))
-            if 1 <= val <= 10000:
+            if 1 <= val <= 10_000:
                 return val
     return 0
 
@@ -153,23 +151,22 @@ def fetch_description(item_id: int) -> str:
     return ""
 
 def analyser_item(titre: str, id_: int, prix: float) -> tuple[int, int]:
-    # Skip immédiat si prix trop élevé même avec MIN_CARTES
     if MIN_CARTES > 0 and (prix / MIN_CARTES) > SEUIL_MAX:
         return id_, -1
 
-    nb = _regex(titre)
+    nb = _count_cards(titre)
     if nb:
         return id_, nb
 
     desc = fetch_description(id_)
     if desc:
-        nb = _regex(titre + " " + desc)
+        nb = _count_cards(titre + " " + desc)
 
     return id_, nb
 
 # ── Discord ────────────────────────────────────────────────────────────────────
 
-def anciennete(ts) -> str:
+def _age(ts) -> str:
     if ts is None:
         return "date inconnue"
     try:
@@ -181,26 +178,7 @@ def anciennete(ts) -> str:
     except Exception:
         return "date inconnue"
 
-def envoyer_rapport(total_analyses: int, trouves: int):
-    if not DISCORD_WEBHOOK_URL:
-        return
-    heure = datetime.now(timezone.utc).strftime("%H:%M UTC")
-    embed = {
-        "title": "📊 Rapport horaire — Veille Pokémon",
-        "color": 0x5865f2,
-        "fields": [
-            {"name": "🔍 Annonces analysées", "value": str(total_analyses), "inline": True},
-            {"name": "✅ Affaires trouvées",   "value": str(trouves),        "inline": True},
-            {"name": "⚙️ Critères",            "value": f"≥{MIN_CARTES} cartes · ≤{SEUIL_MAX}€/carte", "inline": False},
-            {"name": "🕐 Heure",               "value": heure,               "inline": True},
-        ],
-    }
-    try:
-        requests.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]}, timeout=8)
-    except Exception:
-        pass
-
-def envoyer_discord(r: dict) -> bool:
+def envoyer_alerte(r: dict) -> bool:
     if not DISCORD_WEBHOOK_URL:
         return False
     embed = {
@@ -211,7 +189,7 @@ def envoyer_discord(r: dict) -> bool:
             {"name": "💰 Prix",       "value": f"{r['prix']:.2f} €",         "inline": True},
             {"name": "🃏 Cartes",     "value": str(r["nb_cartes"]),           "inline": True},
             {"name": "📉 €/carte",    "value": f"{r['cout_unitaire']:.3f} €", "inline": True},
-            {"name": "🕐 Ancienneté", "value": anciennete(r["created_at"]),   "inline": True},
+            {"name": "🕐 Ancienneté", "value": _age(r["created_at"]),         "inline": True},
         ],
         "thumbnail": {"url": r["photo"]} if r.get("photo") else {},
     }
@@ -221,44 +199,61 @@ def envoyer_discord(r: dict) -> bool:
     except Exception:
         return False
 
+def envoyer_rapport(total_analyses: int, trouves: int):
+    if not DISCORD_WEBHOOK_URL:
+        return
+    embed = {
+        "title": "📊 Rapport horaire — Veille Pokémon",
+        "color": 0x5865f2,
+        "fields": [
+            {"name": "🔍 Annonces analysées", "value": str(total_analyses), "inline": True},
+            {"name": "✅ Affaires trouvées",   "value": str(trouves),        "inline": True},
+            {"name": "⚙️ Critères",            "value": f"≥{MIN_CARTES} cartes · ≤{SEUIL_MAX}€/carte", "inline": False},
+            {"name": "🕐 Heure",               "value": datetime.now(timezone.utc).strftime("%H:%M UTC"), "inline": True},
+        ],
+    }
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]}, timeout=8)
+    except Exception:
+        pass
+
 # ── Scan principal ─────────────────────────────────────────────────────────────
 
 def scan():
-    blacklist        = load_blacklist()
-    deja_notifies    = blacklist.copy()
-    maintenant       = datetime.now(timezone.utc)
-    limite           = timedelta(minutes=ANCIENNETE_MINUTES) if ANCIENNETE_MINUTES > 0 else None
-    trouves          = 0
-    total_analyses   = 0
-    rapport_horaire  = os.getenv("RAPPORT_HORAIRE", "false").lower() == "true"
+    blacklist      = load_blacklist()
+    deja_notifies  = blacklist.copy()
+    maintenant     = datetime.now(timezone.utc)
+    limite         = timedelta(minutes=ANCIENNETE_MINUTES) if ANCIENNETE_MINUTES > 0 else None
+    trouves        = 0
+    total_analyses = 0
+    nouveaux_ids   = set()  # IDs à ajouter à la blacklist en fin de scan
 
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Démarrage scan — {len(MOTS_CLES)} mots-clés | seuil={SEUIL_MAX}€ | min={MIN_CARTES} cartes | ancienneté={ANCIENNETE_MINUTES}min")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Démarrage — {len(MOTS_CLES)} mots-clés | seuil={SEUIL_MAX}€ | min={MIN_CARTES} cartes | ancienneté={ANCIENNETE_MINUTES}min")
 
-    def scan_query(query: str):
-        all_items = scrape_all_pages(query)
+    def scan_query(query: str) -> list[dict]:
+        items = scrape_all_pages(query)
         a_analyser = []
-        for a in all_items:
+        for a in items:
             if a["id"] in deja_notifies:
                 continue
-            if limite:
-                ts = a["created_at"]
-                if ts:
-                    pub = datetime.fromtimestamp(ts, tz=timezone.utc)
-                    if (maintenant - pub) > limite:
-                        continue
+            if limite and a["created_at"]:
+                if (maintenant - datetime.fromtimestamp(a["created_at"], tz=timezone.utc)) > limite:
+                    continue
             if MOTS_EXCLUS and any(m in a["titre_low"] for m in MOTS_EXCLUS):
                 continue
             if MIN_CARTES > 0 and a["prix"] / MIN_CARTES > SEUIL_MAX:
                 continue
             a_analyser.append(a)
 
-        nonlocal total_analyses
-        total_analyses += len(a_analyser)
-        futures = {_EXECUTOR_ITEMS.submit(analyser_item, a["titre"], a["id"], a["prix"]): a for a in a_analyser}
-        resultats = []
+        with _COUNTER_LOCK:
+            nonlocal total_analyses
+            total_analyses += len(a_analyser)
+
+        futures    = {_EXECUTOR_ITEMS.submit(analyser_item, a["titre"], a["id"], a["prix"]): a for a in a_analyser}
+        resultats  = []
         for fut in as_completed(futures):
-            a = futures[fut]
-            _, nb = fut.result()
+            a      = futures[fut]
+            _, nb  = fut.result()
             if nb >= MIN_CARTES:
                 cout = a["prix"] / nb
                 if cout <= SEUIL_MAX:
@@ -274,17 +269,21 @@ def scan():
                     continue
                 deja_notifies.add(r["id"])
 
-            ok = envoyer_discord(r)
-            if ok:
-                bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
+            if envoyer_alerte(r):
+                nouveaux_ids.add(r["id"])
                 trouves += 1
                 print(f"  ✅ [{query}] {r['titre'][:60]} — {r['nb_cartes']} cartes @ {r['cout_unitaire']:.3f}€/c")
             else:
                 with _NOTIFY_LOCK:
                     deja_notifies.discard(r["id"])
 
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] Scan terminé — {trouves} affaire(s) envoyée(s) | {total_analyses} annonces analysées")
-    if rapport_horaire:
+    # Sauvegarde blacklist en une seule écriture
+    if nouveaux_ids:
+        save_blacklist(blacklist | nouveaux_ids)
+
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Terminé — {trouves} affaire(s) | {total_analyses} annonces analysées")
+
+    if RAPPORT_HORAIRE:
         envoyer_rapport(total_analyses, trouves)
 
 if __name__ == "__main__":
