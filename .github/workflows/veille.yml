@@ -1,0 +1,34 @@
+name: Veille Pokémon Vinted
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # toutes les 30 minutes
+  workflow_dispatch:          # lancement manuel possible depuis GitHub
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests urllib3 python-dotenv
+
+      - name: Run veille
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MOTS_CLES:           "gros lot cartes pokemon,lot vrac pokemon,collection pokemon,pokemon,lot cartes pokemon,reverses pokemon"
+          MOTS_EXCLUS:         ""
+          SEUIL_MAX:           "0.04"
+          MIN_CARTES:          "300"
+          ANCIENNETE_MINUTES:  "60"
+        run: python veille.py

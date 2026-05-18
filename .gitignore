@@ -1,0 +1,5 @@
+.env
+blacklist.json
+__pycache__/
+*.pyc
+.streamlit/
