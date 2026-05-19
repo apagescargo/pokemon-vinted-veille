@@ -578,9 +578,38 @@ def main():
                 st.info("Aucun lot avec nombre de cartes ≥100 détecté dans le titre.")
 
             if lots_sans_nb:
-                with st.expander(f"⚠️ {len(lots_sans_nb)} lot(s) sans nombre de cartes détecté"):
-                    for a in lots_sans_nb:
-                        st.markdown(f"- [{a['titre'][:80]}]({a['url']}) — 💰 {a['prix']:.2f}€")
+                # Tentative de récupération depuis la description
+                futures_desc = {
+                    _EXECUTOR_ITEMS.submit(fetch_description, a["id"]): a
+                    for a in lots_sans_nb
+                }
+                recuperes = []
+                toujours_inconnus = []
+                for fut in as_completed(futures_desc):
+                    a    = futures_desc[fut]
+                    desc = fut.result()
+                    nb   = _regex(a["titre"] + " " + desc) if desc else 0
+                    if nb >= LOT_MIN_CARTES:
+                        recuperes.append((a, nb, round(a["prix"] / nb, 4)))
+                    else:
+                        toujours_inconnus.append((a, desc))
+
+                if recuperes:
+                    recuperes.sort(key=lambda x: x[2])
+                    st.markdown("**Lots récupérés via description :**")
+                    for a, nb, pu in recuperes:
+                        lots_avec_nb.append((a, nb, round(a["prix"] / nb, 4)))
+                        st.markdown(
+                            f"[{a['titre'][:70]}]({a['url']}) — "
+                            f"💰 {a['prix']:.2f}€ · 🃏 {nb} cartes · 📉 **{pu:.4f}€/carte**"
+                        )
+
+                if toujours_inconnus:
+                    with st.expander(f"⚠️ {len(toujours_inconnus)} lot(s) sans nb de cartes (titre + description)"):
+                        for a, desc in toujours_inconnus:
+                            st.markdown(f"**[{a['titre'][:80]}]({a['url']})** — 💰 {a['prix']:.2f}€")
+                            if desc:
+                                st.caption(desc[:200])
 
             st.divider()
 
