@@ -557,6 +557,15 @@ def main():
             else:
                 st.info("Aucun lot avec nombre de cartes détecté dans le titre.")
 
+            st.divider()
+
+            # Échantillon "Autre" pour affinage des catégories
+            st.markdown("#### ❓ Échantillon — catégorie Autre (pour affinage)")
+            autres = [a for a in items if a["categorie"] == "❓ Autre"][:5]
+            if autres:
+                for a in autres:
+                    st.markdown(f"- [{a['titre']}]({a['url']}) — 💰 {a['prix']:.2f}€")
+
             st.caption(f"Prochain rafraîchissement dans 1 min")
 
         _onglet_analyse()
