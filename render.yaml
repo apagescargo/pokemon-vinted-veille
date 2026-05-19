@@ -1,0 +1,20 @@
+services:
+  - type: cron
+    name: veille-pokemon-vinted
+    runtime: python
+    schedule: "*/30 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python veille.py
+    envVars:
+      - key: DISCORD_WEBHOOK_URL
+        sync: false           # à renseigner manuellement dans le dashboard Render
+      - key: MOTS_CLES
+        value: "gros lot cartes pokemon,lot vrac pokemon,collection pokemon,pokemon,lot cartes pokemon,reverses pokemon"
+      - key: MOTS_EXCLUS
+        value: ""
+      - key: SEUIL_MAX
+        value: "0.04"
+      - key: MIN_CARTES
+        value: "300"
+      - key: ANCIENNETE_MINUTES
+        value: "60"

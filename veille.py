@@ -19,7 +19,11 @@ MOTS_EXCLUS        = [m.strip().lower() for m in os.getenv("MOTS_EXCLUS", "").sp
 SEUIL_MAX          = float(os.getenv("SEUIL_MAX", "0.04"))
 MIN_CARTES         = int(os.getenv("MIN_CARTES", "300"))
 ANCIENNETE_MINUTES = int(os.getenv("ANCIENNETE_MINUTES", "60"))
-RAPPORT_HORAIRE    = os.getenv("RAPPORT_HORAIRE", "false").lower() == "true"
+# Rapport horaire : forcé via env var OU auto-détecté si on tourne à heure pile (minute == 0)
+RAPPORT_HORAIRE    = (
+    os.getenv("RAPPORT_HORAIRE", "false").lower() == "true"
+    or datetime.now(timezone.utc).minute == 0
+)
 
 VINTED_HEADERS = {
     "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
