@@ -199,7 +199,7 @@ def fetch_description(item_id: int) -> str:
                     if m:
                         return json.loads(m.group(1)).get("description", "")
                 # Sécurité : si on dépasse 30 Ko sans trouver le bloc, on abandonne
-                if len(buf) > 30_000:
+                if len(buf) > 150_000:
                     break
     except Exception:
         pass
