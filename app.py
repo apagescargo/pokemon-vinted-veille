@@ -556,22 +556,31 @@ def main():
 
             st.divider()
 
-            # Liste des lots avec prix/carte
-            st.markdown("#### 📦 Détail des lots ≥100 cartes (triés par €/carte)")
-            lots_items = []
+            # Liste des lots
+            st.markdown("#### 📦 Détail des lots (triés par €/carte)")
+            lots_avec_nb, lots_sans_nb = [], []
             for a in items:
-                if a["categorie"] == "📦 Lot de cartes" and a["nb_cartes_detect"] >= LOT_MIN_CARTES:
-                    lots_items.append((a, a["nb_cartes_detect"], round(a["prix"] / a["nb_cartes_detect"], 4)))
-            lots_items.sort(key=lambda x: x[2])
+                if a["categorie"] == "📦 Lot de cartes":
+                    nb = a["nb_cartes_detect"]
+                    if nb >= LOT_MIN_CARTES:
+                        lots_avec_nb.append((a, nb, round(a["prix"] / nb, 4)))
+                    else:
+                        lots_sans_nb.append(a)
+            lots_avec_nb.sort(key=lambda x: x[2])
 
-            if lots_items:
-                for a, nb, pu in lots_items[:15]:
+            if lots_avec_nb:
+                for a, nb, pu in lots_avec_nb[:15]:
                     st.markdown(
                         f"[{a['titre'][:70]}]({a['url']}) — "
                         f"💰 {a['prix']:.2f}€ · 🃏 {nb} cartes · 📉 **{pu:.4f}€/carte**"
                     )
             else:
-                st.info("Aucun lot avec nombre de cartes détecté dans le titre.")
+                st.info("Aucun lot avec nombre de cartes ≥100 détecté dans le titre.")
+
+            if lots_sans_nb:
+                with st.expander(f"⚠️ {len(lots_sans_nb)} lot(s) sans nombre de cartes détecté"):
+                    for a in lots_sans_nb:
+                        st.markdown(f"- [{a['titre'][:80]}]({a['url']}) — 💰 {a['prix']:.2f}€")
 
             st.divider()
 
