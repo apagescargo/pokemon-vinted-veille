@@ -91,7 +91,9 @@ def scrape_page(query: str, page: int) -> list[dict]:
         )
         resp.raise_for_status()
         data = resp.json()
-    except Exception:
+    except Exception as e:
+        if page == 1:
+            print(f"  ⚠️ [{query}] page {page} — erreur : {e}")
         return []
 
     items = []
