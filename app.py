@@ -369,7 +369,10 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
 _CATEGORIES = {
     "📦 Lot de cartes":       ["lot", "vrac", "bulk", "collection", "tas"],
     "🏆 Cartes gradées":       ["psa", "bgs", "cgc", "ace", "gradé", "grade", "slabbed"],
-    "✨ Cartes rares":         ["holo", " ex ", " gx ", " vmax ", " vstar ", "full art", "secret rare", "gold", "rainbow"],
+    "✨ Cartes rares":         ["holo", "full art", "secret rare", "gold", "rainbow",
+                                " ex ", " ex\n", "ex ", "gx ", " gx", "vmax", "vstar", "v-union"],
+    "🃏 Carte à l'unité":     ["kaart", "deutsch", "italiano", "español", "near mint",
+                                "mint condition", "nm/m", "carte unique", "single"],
     "🎁 Boosters / Display":  ["booster", "display", "étui", " eb ", " sv "],
     "📗 Classeurs":            ["classeur", "binder", "portfolio", "album"],
     "🎮 Jeux vidéo":           [" ds ", "switch", "gba", "gameboy", "jeu vidéo", "jeux video"],
@@ -377,15 +380,20 @@ _CATEGORIES = {
     "🗃️ Coffrets / Decks":    ["coffret", "deck", "starter", "dresseur"],
 }
 
+# Pattern set number : "095/094", "015/165" → carte à l'unité
+_SET_NUMBER_RE = re.compile(r"\d{2,3}/\d{2,3}")
+
 LOT_MIN_CARTES = 100  # en dessous → "Petits lots / singles"
 
 def categoriser(titre_low: str, nb_cartes: int = 0) -> str:
     for cat, mots in _CATEGORIES.items():
         if any(m in titre_low for m in mots):
-            # Un "lot" avec moins de 100 cartes détectées → petits lots
             if cat == "📦 Lot de cartes" and 0 < nb_cartes < LOT_MIN_CARTES:
                 return "🃏 Petits lots / singles"
             return cat
+    # Numéro de set détecté (ex: 015/165) → carte à l'unité
+    if _SET_NUMBER_RE.search(titre_low):
+        return "🃏 Carte à l'unité"
     return "❓ Autre"
 
 
@@ -410,7 +418,7 @@ def main():
         st.header("🔍 Paramètres")
         mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
         queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
-        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto")
+        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama")
         mots_exclus     = [m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()]
         seuil_max       = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
         min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
