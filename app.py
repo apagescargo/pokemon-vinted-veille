@@ -410,7 +410,7 @@ def main():
         st.header("🔍 Paramètres")
         mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
         queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
-        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="")
+        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto")
         mots_exclus     = [m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()]
         seuil_max       = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
         min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
@@ -459,6 +459,10 @@ def main():
             if not items:
                 st.warning("Impossible de charger les annonces.")
                 return
+
+            # Appliquer les mots exclus de la sidebar
+            if mots_exclus:
+                items = [a for a in items if not any(m in a["titre_low"] for m in mots_exclus)]
 
             # Catégorisation avec nb cartes pour distinguer lots/singles
             for a in items:
