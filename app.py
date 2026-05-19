@@ -368,6 +368,7 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
 
 _CATEGORIES = {
     "📦 Lot de cartes":       ["lot", "vrac", "bulk", "collection", "tas"],
+    "🏆 Cartes gradées":       ["psa", "bgs", "cgc", "ace", "gradé", "grade", "slabbed"],
     "✨ Cartes rares":         ["holo", " ex ", " gx ", " vmax ", " vstar ", "full art", "secret rare", "gold", "rainbow"],
     "🎁 Boosters / Display":  ["booster", "display", "étui", " eb ", " sv "],
     "📗 Classeurs":            ["classeur", "binder", "portfolio", "album"],
@@ -376,9 +377,14 @@ _CATEGORIES = {
     "🗃️ Coffrets / Decks":    ["coffret", "deck", "starter", "dresseur"],
 }
 
-def categoriser(titre_low: str) -> str:
+LOT_MIN_CARTES = 100  # en dessous → "Petits lots / singles"
+
+def categoriser(titre_low: str, nb_cartes: int = 0) -> str:
     for cat, mots in _CATEGORIES.items():
         if any(m in titre_low for m in mots):
+            # Un "lot" avec moins de 100 cartes détectées → petits lots
+            if cat == "📦 Lot de cartes" and 0 < nb_cartes < LOT_MIN_CARTES:
+                return "🃏 Petits lots / singles"
             return cat
     return "❓ Autre"
 
@@ -445,7 +451,7 @@ def main():
 
     # ── Onglet Analyse ─────────────────────────────────────────────────────────
     with tab2:
-        @st.fragment(run_every=120)
+        @st.fragment(run_every=60)
         def _onglet_analyse():
             with st.spinner("Chargement des 100 dernières annonces…"):
                 items = scrape_all_pages("pokemon")[:100]
@@ -454,21 +460,21 @@ def main():
                 st.warning("Impossible de charger les annonces.")
                 return
 
-            # Catégorisation
+            # Catégorisation avec nb cartes pour distinguer lots/singles
             for a in items:
-                a["categorie"] = categoriser(a["titre_low"])
+                nb = _regex(a["titre"])
+                a["nb_cartes_detect"] = nb
+                a["categorie"] = categoriser(a["titre_low"], nb)
 
             # Comptage par catégorie
             from collections import Counter
             counts = Counter(a["categorie"] for a in items)
 
-            # Prix moyen/carte pour les lots
+            # Prix moyen/carte pour les vrais lots (≥100 cartes)
             lots = []
             for a in items:
-                if a["categorie"] == "📦 Lot de cartes":
-                    nb = _regex(a["titre"])
-                    if nb > 0:
-                        lots.append(round(a["prix"] / nb, 4))
+                if a["categorie"] == "📦 Lot de cartes" and a["nb_cartes_detect"] > 0:
+                    lots.append(round(a["prix"] / a["nb_cartes_detect"], 4))
 
             prix_moyen = round(sum(lots) / len(lots), 4) if lots else None
 
@@ -524,20 +530,18 @@ def main():
                         df = df.set_index("Heure")
                         st.line_chart(df)
                     else:
-                        st.info("En attente de données… (2 min)")
+                        st.info("En attente de données… (1 min)")
                 else:
-                    st.info("En attente du 2ème scan… (2 min)")
+                    st.info("En attente du 2ème scan… (1 min)")
 
             st.divider()
 
             # Liste des lots avec prix/carte
-            st.markdown("#### 📦 Détail des lots (avec nb cartes détecté)")
+            st.markdown("#### 📦 Détail des lots ≥100 cartes (triés par €/carte)")
             lots_items = []
             for a in items:
-                if a["categorie"] == "📦 Lot de cartes":
-                    nb = _regex(a["titre"])
-                    if nb > 0:
-                        lots_items.append((a, nb, round(a["prix"] / nb, 4)))
+                if a["categorie"] == "📦 Lot de cartes" and a["nb_cartes_detect"] >= LOT_MIN_CARTES:
+                    lots_items.append((a, a["nb_cartes_detect"], round(a["prix"] / a["nb_cartes_detect"], 4)))
             lots_items.sort(key=lambda x: x[2])
 
             if lots_items:
@@ -549,7 +553,7 @@ def main():
             else:
                 st.info("Aucun lot avec nombre de cartes détecté dans le titre.")
 
-            st.caption(f"Prochain rafraîchissement dans 2 min")
+            st.caption(f"Prochain rafraîchissement dans 1 min")
 
         _onglet_analyse()
 
