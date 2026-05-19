@@ -367,21 +367,24 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
 # ── Catégorisation ─────────────────────────────────────────────────────────────
 
 _CATEGORIES = {
-    "📦 Lot de cartes":       ["lot", "vrac", "bulk", "collection", "tas"],
-    "🏆 Cartes gradées":       ["psa", "bgs", "cgc", "ace", "gradé", "grade", "slabbed"],
-    "✨ Cartes rares":         ["holo", "full art", "secret rare", "gold", "rainbow",
-                                " ex ", " ex\n", "ex ", "gx ", " gx", "vmax", "vstar", "v-union"],
-    "🃏 Carte à l'unité":     ["kaart", "deutsch", "italiano", "español", "near mint",
-                                "mint condition", "nm/m", "carte unique", "single"],
-    "🎁 Boosters / Display":  ["booster", "display", "étui", " eb ", " sv "],
-    "📗 Classeurs":            ["classeur", "binder", "portfolio", "album"],
-    "🎮 Jeux vidéo":           [" ds ", "switch", "gba", "gameboy", "jeu vidéo", "jeux video"],
-    "🧸 Peluches / Figurines": ["peluche", "figurine", "statue", "plush"],
-    "🗃️ Coffrets / Decks":    ["coffret", "deck", "starter", "dresseur"],
+    "📦 Lot de cartes":        ["lot", "vrac", "bulk", "collection", "tas"],
+    "🏆 Cartes gradées":        ["psa", "bgs", "cgc", "ace", "gradé", "grade", "slabbed"],
+    "✨ Cartes rares":          ["holo", "full art", "secret rare", "gold", "rainbow",
+                                 " ex ", "ex ", " gx", "gx ", "vmax", "vstar", "v-union"],
+    "🃏 Carte à l'unité":      ["kaart", "carta ", "carte ", "deutsch", "italiano", "español",
+                                 "near mint", "mint condition", "nm/m", "single", " ita ", " eng "],
+    "🎁 Boosters / Display":   ["booster", "display", "étui", " eb ", " sv "],
+    "📗 Classeurs":             ["classeur", "binder", "portfolio", "album"],
+    "🎮 Jeux vidéo":            [" ds ", "switch", "gba", "gameboy", "jeu vidéo", "jeux video"],
+    "🧸 Peluches / Figurines":  ["peluche", "figurine", "statue", "plush", "knuffel", "rugzak",
+                                  "backpack", "sac à dos", "mug", "t-shirt", "tshirt", "poster"],
+    "🗃️ Coffrets / Decks":     ["coffret", "deck", "starter", "dresseur"],
+    "🎒 Goodies / Accessoires": ["pin ", "badge", "porte-monnaie", "portefeuille", "carte cadeau",
+                                  "stylo", "trousse", "casquette", "vêtement"],
 }
 
-# Pattern set number : "095/094", "015/165" → carte à l'unité
-_SET_NUMBER_RE = re.compile(r"\d{2,3}/\d{2,3}")
+# Numéro de set : "095/094", "82/111", "s11a 073" → carte à l'unité
+_SET_NUMBER_RE = re.compile(r"(?:\d{2,3}/\d{2,3}|[a-z]\d+[a-z]?\s+\d{3})")
 
 LOT_MIN_CARTES = 100  # en dessous → "Petits lots / singles"
 
