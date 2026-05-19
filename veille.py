@@ -232,6 +232,11 @@ def scan():
 
     def scan_query(query: str) -> list[dict]:
         items = scrape_all_pages(query)
+
+        with _COUNTER_LOCK:
+            nonlocal total_analyses
+            total_analyses += len(items)
+
         a_analyser = []
         for a in items:
             if a["id"] in deja_notifies:
@@ -244,10 +249,6 @@ def scan():
             if MIN_CARTES > 0 and a["prix"] / MIN_CARTES > SEUIL_MAX:
                 continue
             a_analyser.append(a)
-
-        with _COUNTER_LOCK:
-            nonlocal total_analyses
-            total_analyses += len(a_analyser)
 
         futures    = {_EXECUTOR_ITEMS.submit(analyser_item, a["titre"], a["id"], a["prix"]): a for a in a_analyser}
         resultats  = []
