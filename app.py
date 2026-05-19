@@ -372,19 +372,24 @@ _CATEGORIES = {
     "✨ Cartes rares":          ["holo", "full art", "secret rare", "gold", "rainbow",
                                  " ex ", "ex ", " gx", "gx ", "vmax", "vstar", "v-union"],
     "🃏 Carte à l'unité":      ["kaart", "carta ", "carte ", "deutsch", "italiano", "español",
-                                 "near mint", "mint condition", "nm/m", "single", " ita ", " eng "],
+                                 "near mint", "mint condition", "nm/m", "single",
+                                 " ita", " eng ", "promo", "gallery"],
     "🎁 Boosters / Display":   ["booster", "display", "étui", " eb ", " sv "],
     "📗 Classeurs":             ["classeur", "binder", "portfolio", "album"],
     "🎮 Jeux vidéo":            [" ds ", "switch", "gba", "gameboy", "jeu vidéo", "jeux video"],
     "🧸 Peluches / Figurines":  ["peluche", "figurine", "statue", "plush", "knuffel", "rugzak",
-                                  "backpack", "sac à dos", "mug", "t-shirt", "tshirt", "poster"],
+                                  "backpack", "sac à dos", "mug", "t-shirt", "t shirt", "tshirt", "poster"],
     "🗃️ Coffrets / Decks":     ["coffret", "deck", "starter", "dresseur"],
-    "🎒 Goodies / Accessoires": ["pin ", "badge", "porte-monnaie", "portefeuille", "carte cadeau",
-                                  "stylo", "trousse", "casquette", "vêtement"],
+    "🎒 Goodies / Accessoires": ["pin ", "badge", "porte-monnaie", "portefeuille",
+                                  "stylo", "trousse", "casquette"],
 }
 
-# Numéro de set : "095/094", "82/111", "s11a 073" → carte à l'unité
-_SET_NUMBER_RE = re.compile(r"(?:\d{2,3}/\d{2,3}|[a-z]\d+[a-z]?\s+\d{3})")
+# Numéro de set : "095/094", "82/111", "s11a 073", "#152", "sv-p 291"
+_SET_NUMBER_RE = re.compile(
+    r"(?:\d{2,3}/\d{2,3}"       # 082/111
+    r"|[a-z]{1,4}-?[a-z]?\s*\d{3}"  # s11a 073, sv-p 291, svp 212
+    r"|#\d{2,3})"                # #51, #152
+)
 
 LOT_MIN_CARTES = 100  # en dessous → "Petits lots / singles"
 
@@ -421,7 +426,7 @@ def main():
         st.header("🔍 Paramètres")
         mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
         queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
-        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama")
+        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin")
         mots_exclus     = [m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()]
         seuil_max       = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
         min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
