@@ -316,6 +316,11 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
     maintenant = datetime.now(timezone.utc)
     all_items  = scrape_all_pages(query)
 
+    # Timestamps min/max sur toutes les annonces scrappées
+    ts_valides = [a["created_at"] for a in all_items if a["created_at"]]
+    ts_min = min(ts_valides) if ts_valides else None
+    ts_max = max(ts_valides) if ts_valides else None
+
     # Fix #4 : blacklist chargée une seule fois (passée en param), pas relue ici
     # Pré-filtre O(N) CPU pur — utilise titre_low précalculé (fix #5)
     a_analyser, exclu_date, exclu_bl, exclu_mots, exclu_prix = [], 0, 0, 0, 0
@@ -362,6 +367,8 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
                 "trop_peu":   trop_peu,
                 "trop_cher":  trop_cher,
                 "affaires":   len(nouveaux),
+                "ts_min":     ts_min,
+                "ts_max":     ts_max,
             })
     return nouveaux
 
@@ -704,17 +711,24 @@ def main():
             if "diag" in st.session_state and st.session_state["diag"]:
                 diag_data = st.session_state["diag"]
                 with st.expander("🔬 Dernière analyse — détail par mot-clé", expanded=True):
-                    header = "| Mot-clé | Scrappées | Analysées | Affaires |"
-                    sep    = "|---|---:|---:|---:|"
+                    def _fmt_ts(ts):
+                        if ts is None: return "—"
+                        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%H:%M")
+
+                    header = "| Mot-clé | Scrappées | Analysées | Affaires | 🕐 Plus ancienne | 🕐 Plus récente |"
+                    sep    = "|---|---:|---:|---:|---:|---:|"
                     rows   = [
-                        f"| `{d['query']}` | {d['scrappees']} | {d['analysees']} | {'✅ ' + str(d['affaires']) if d['affaires'] else '—'} |"
+                        f"| `{d['query']}` | {d['scrappees']} | {d['analysees']} "
+                        f"| {'✅ ' + str(d['affaires']) if d['affaires'] else '—'} "
+                        f"| {_fmt_ts(d.get('ts_min'))} | {_fmt_ts(d.get('ts_max'))} |"
                         for d in diag_data
                     ]
                     total_s = sum(d["scrappees"] for d in diag_data)
                     total_a = sum(d["analysees"] for d in diag_data)
                     total_f = sum(d["affaires"]  for d in diag_data)
-                    rows.append(f"| **TOTAL** | **{total_s}** | **{total_a}** | **{'✅ ' + str(total_f) if total_f else '—'}** |")
+                    rows.append(f"| **TOTAL** | **{total_s}** | **{total_a}** | **{'✅ ' + str(total_f) if total_f else '—'}** | | |")
                     st.markdown("\n".join([header, sep] + rows))
+                    st.caption("Heures en UTC — France = UTC+2 en été")
                     with st.expander("détail des exclusions"):
                         for d in diag_data:
                             st.markdown(
