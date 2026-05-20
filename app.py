@@ -48,9 +48,10 @@ LIMITES = {
 
 MOTS_CLES_DEFAUT = "gros lot cartes pokemon\nlot vrac pokemon\ncollection pokemon\npokemon\nlot cartes pokemon\nreverses pokemon"
 
-# Fix deadlock : deux pools séparés — jamais de nesting dans le même pool
-_EXECUTOR_QUERIES = ThreadPoolExecutor(max_workers=5)   # parallélisme inter-requêtes
-_EXECUTOR_ITEMS   = ThreadPoolExecutor(max_workers=32)  # parallélisme intra-requête (analyse items)
+# Trois pools séparés — aucun nesting dans le même pool
+_EXECUTOR_QUERIES = ThreadPoolExecutor(max_workers=5)   # 1 thread par mot-clé
+_EXECUTOR_PAGES   = ThreadPoolExecutor(max_workers=20)  # scraping pages Vinted (I/O réseau pur)
+_EXECUTOR_ITEMS   = ThreadPoolExecutor(max_workers=16)  # analyse items (regex + fetch description)
 _DIAG_LOCK        = threading.Lock()                    # Fix thread-safety diag list
 _NOTIFY_LOCK      = threading.Lock()                    # Fix double-envoi Discord
 
@@ -140,13 +141,12 @@ def _scrape_page_cached(query: str, page: int) -> tuple[list[dict], int]:
         return [], 0
 
 def scrape_all_pages(query: str) -> list[dict]:
-    """Fix #3 : toutes les pages en parallèle dès le début.
-    On lance pages 1..10 simultanément, on déduit total_pages de la page 1,
-    on annule les futures inutiles."""
-    MAX_PROBE = 10  # max pages à sonder en parallèle
+    """Scrape les pages en parallèle via _EXECUTOR_PAGES (pool dédié réseau).
+    On sonde d'abord la page 1 pour connaître total_pages, puis on lance les suivantes."""
+    MAX_PROBE = 5  # Vinted retourne rarement plus de 3-4 pages utiles
 
     futures = {
-        _EXECUTOR_ITEMS.submit(_scrape_page_cached, query, p): p
+        _EXECUTOR_PAGES.submit(_scrape_page_cached, query, p): p
         for p in range(1, MAX_PROBE + 1)
     }
 
@@ -494,7 +494,8 @@ def main():
 
     # ── Onglet Analyse ─────────────────────────────────────────────────────────
     with tab2:
-        @st.fragment(run_every=60)
+        st.info("⏸️ Analyse du marché désactivée temporairement (optimisation en cours).")
+        # @st.fragment(run_every=60)
         def _onglet_analyse():
             with st.spinner("Chargement des 100 dernières annonces…"):
                 items = scrape_all_pages("pokemon")[:100]
@@ -608,7 +609,7 @@ def main():
             if lots_sans_nb:
                 # Tentative de récupération depuis la description
                 futures_desc = {
-                    _EXECUTOR_ITEMS.submit(fetch_description, a["id"]): a
+                    _EXECUTOR_PAGES.submit(fetch_description, a["id"]): a
                     for a in lots_sans_nb
                 }
                 recuperes = []
