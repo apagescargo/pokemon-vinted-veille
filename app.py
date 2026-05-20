@@ -833,6 +833,25 @@ def main():
 
     # ── Onglet Recherche & Veille ──────────────────────────────────────────────
     with tab1:
+
+        # ── Panneau de contrôle ────────────────────────────────────────────────
+        pan_cartes, pan_binders = st.columns(2)
+        with pan_cartes:
+            cartes_actif = st.toggle(
+                f"🃏 Alertes Cartes {'· ' + ('⚡ rapide' if mode_rapide else '🔵 complet') }",
+                value=True, key="pan_cartes",
+                help=f"{len(queries)} mots-clés · seuil {seuil_max:.2f}€/carte · min {min_cartes} cartes"
+            )
+        with pan_binders:
+            binders_actif = st.toggle(
+                "🗂️ Alertes Binders Vault X",
+                value=vault_on, key="pan_binders",
+                help=f"Prix max {vault_max_prix}€/unité · {len(vault_queries)} mots-clés" if vault_queries else "Configurer dans la sidebar"
+            )
+            if binders_actif and not vault_on:
+                st.caption("⚠️ Active d'abord les binders dans la sidebar")
+        st.divider()
+
         if st.session_state["veille_active"]:
             col_status, col_stop = st.columns([4, 1])
             with col_status:
@@ -857,7 +876,7 @@ def main():
                     futures_veille = {
                         _EXECUTOR_QUERIES.submit(scanner_query, q, seuil_max, min_cartes, limite,
                                                  cache, blacklist, deja_notifies, mots_exclus, diag_run): q
-                        for q in queries
+                        for q in (queries if cartes_actif else [])
                     }
                     for fut in as_completed(futures_veille):
                         for r in fut.result():
@@ -875,7 +894,7 @@ def main():
                                     deja_notifies.discard(r["id"])
 
                     # ── Scan Vault X binders ───────────────────────────────────
-                    if vault_on and vault_queries:
+                    if binders_actif and vault_on and vault_queries:
                         for r in scanner_produit(vault_queries, vault_max_prix, vault_inclus,
                                                  [], blacklist, deja_notifies):
                             with _NOTIFY_LOCK:
@@ -935,30 +954,30 @@ def main():
         else:
             # ── Recherche manuelle ─────────────────────────────────────────────
             if lancer:
-                if not queries:
-                    st.warning("Ajoutez au moins un mot-clé.")
+                if not cartes_actif and not binders_actif:
+                    st.warning("Active au moins un type d'alerte dans le panneau de contrôle.")
                 else:
                     cache  = st.session_state["analyse_cache"]
                     limite = LIMITES[filtre_date]
                     diag   = []
 
-                    with st.spinner(f"Scan de {len(queries)} mot(s)-clé(s) en parallèle…"):
-                        futures_search = {
-                            _EXECUTOR_QUERIES.submit(scanner_query, q, seuil_max, min_cartes, limite,
-                                                     cache, blacklist, set(), mots_exclus, diag): q
-                            for q in queries
-                        }
-                        resultats = []
-                        for fut in as_completed(futures_search):
-                            for r in fut.result():
-                                if not any(x["id"] == r["id"] for x in resultats):
-                                    resultats.append(r)
-
-                    st.session_state["resultats"] = resultats
-                    st.session_state["diag"]      = diag
+                    if cartes_actif:
+                        with st.spinner(f"Scan cartes — {len(queries)} mot(s)-clé(s)…"):
+                            futures_search = {
+                                _EXECUTOR_QUERIES.submit(scanner_query, q, seuil_max, min_cartes, limite,
+                                                         cache, blacklist, set(), mots_exclus, diag): q
+                                for q in queries
+                            }
+                            resultats = []
+                            for fut in as_completed(futures_search):
+                                for r in fut.result():
+                                    if not any(x["id"] == r["id"] for x in resultats):
+                                        resultats.append(r)
+                        st.session_state["resultats"] = resultats
+                        st.session_state["diag"]      = diag
 
                     # Scan binders Vault X en recherche manuelle
-                    if vault_on and vault_queries:
+                    if binders_actif and vault_on and vault_queries:
                         with st.spinner("Scan binders Vault X…"):
                             st.session_state["resultats_vault"] = scanner_produit(
                                 vault_queries, vault_max_prix, vault_inclus,
