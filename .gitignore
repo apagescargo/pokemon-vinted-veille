@@ -1,5 +1,6 @@
 .env
 blacklist.json
+mots_exclus.json
 __pycache__/
 *.pyc
 .streamlit/

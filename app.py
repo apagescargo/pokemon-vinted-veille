@@ -18,6 +18,7 @@ load_dotenv()
 GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY")
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 BLACKLIST_FILE      = os.path.join(os.path.dirname(__file__), "blacklist.json")
+MOTS_EXCLUS_FILE    = os.path.join(os.path.dirname(__file__), "mots_exclus.json")
 
 if GEMINI_API_KEY:
     _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -90,6 +91,17 @@ def load_blacklist() -> set:
 def save_blacklist(bl: set):
     with open(BLACKLIST_FILE, "w") as f:
         json.dump(list(bl), f)
+
+def load_mots_exclus_permanents() -> list[str]:
+    try:
+        with open(MOTS_EXCLUS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def save_mots_exclus_permanents(mots: list[str]):
+    with open(MOTS_EXCLUS_FILE, "w") as f:
+        json.dump(mots, f)
 
 
 # ── Vinted scraping ────────────────────────────────────────────────────────────
@@ -431,14 +443,18 @@ def main():
             st.session_state[k] = v
 
     # Fix #4 : une seule lecture disque par rerun
-    blacklist = load_blacklist()
+    blacklist        = load_blacklist()
+    mots_exclus_perm = load_mots_exclus_permanents()
 
     with st.sidebar:
         st.header("🔍 Paramètres")
         mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
         queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
         mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos")
-        mots_exclus     = [m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()]
+        # Fusion sidebar + permanents (dédoublonnés)
+        mots_exclus = list({m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()} | set(mots_exclus_perm))
+        if mots_exclus_perm:
+            st.caption(f"🚫 Permanents : {', '.join(mots_exclus_perm)}")
         seuil_max       = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
         min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
         filtre_date     = st.selectbox("Ancienneté max", list(LIMITES), index=1)
@@ -781,6 +797,18 @@ def main():
                             if st.button("🚫 Masquer", key=f"hide_{r['id']}", use_container_width=True):
                                 bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
                                 st.rerun()
+                            mot_key = f"mot_exclu_{r['id']}"
+                            mot = st.text_input("", placeholder="mot à exclure", key=mot_key,
+                                                label_visibility="collapsed")
+                            if st.button("➕ Exclure", key=f"exclu_{r['id']}", use_container_width=True):
+                                mot_clean = mot.strip().lower()
+                                if mot_clean:
+                                    perm = load_mots_exclus_permanents()
+                                    if mot_clean not in perm:
+                                        perm.append(mot_clean)
+                                        save_mots_exclus_permanents(perm)
+                                    st.toast(f"✅ « {mot_clean} » ajouté aux exclusions permanentes")
+                                    st.rerun()
                         st.divider()
 
 
