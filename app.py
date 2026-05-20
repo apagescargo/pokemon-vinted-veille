@@ -438,7 +438,8 @@ def main():
         st.info("ℹ️ Pas de clé Gemini — extraction par regex + HTML uniquement.")
 
     for k, v in [("analyse_cache", {}), ("resultats", []), ("deja_notifies", set()),
-                 ("veille_active", False), ("veille_log", []), ("analyse_history", [])]:
+                 ("veille_active", False), ("veille_log", []), ("analyse_history", []),
+                 ("veille_runs", [])]:
         if k not in st.session_state:
             st.session_state[k] = v
 
@@ -669,11 +670,15 @@ def main():
                 deja_notifies = st.session_state["deja_notifies"]
                 limite        = LIMITES[filtre_date]
                 logs          = st.session_state["veille_log"]
+                runs          = st.session_state["veille_runs"]
+                diag_run      = []
+                affaires_run  = 0
+                heure_run     = datetime.now().strftime("%H:%M:%S")
 
                 with st.spinner("Scan en cours…"):
                     futures_veille = {
                         _EXECUTOR_QUERIES.submit(scanner_query, q, seuil_max, min_cartes, limite,
-                                                 cache, blacklist, deja_notifies, mots_exclus): q
+                                                 cache, blacklist, deja_notifies, mots_exclus, diag_run): q
                         for q in queries
                     }
                     for fut in as_completed(futures_veille):
@@ -685,16 +690,49 @@ def main():
                             ok = envoyer_discord(r)
                             if ok:
                                 bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
+                                affaires_run += 1
                                 logs.insert(0, f"✅ {datetime.now().strftime('%H:%M:%S')} — **{r['titre'][:50]}** ({r['nb_cartes']} cartes, {r['cout_unitaire']:.3f}€/c)")
                             else:
                                 with _NOTIFY_LOCK:
                                     deja_notifies.discard(r["id"])
 
-                st.session_state["veille_log"] = logs[:50]
+                # Résumé du run
+                total_scrap = sum(d["scrappees"] for d in diag_run)
+                total_anal  = sum(d["analysees"] for d in diag_run)
+                run_entry   = {
+                    "heure":    heure_run,
+                    "scrap":    total_scrap,
+                    "anal":     total_anal,
+                    "affaires": affaires_run,
+                }
+                runs.insert(0, run_entry)
+                st.session_state["veille_runs"] = runs[:20]  # 20 runs max
+                st.session_state["veille_log"]  = logs[:50]
+
+                # ── Métriques du dernier run ───────────────────────────────────
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("🕐 Dernier scan", heure_run)
+                c2.metric("📡 Scrappées",    total_scrap)
+                c3.metric("🔍 Analysées",    total_anal)
+                c4.metric("✅ Affaires",     affaires_run)
+
+                # ── Historique des runs ────────────────────────────────────────
+                if len(runs) > 1:
+                    with st.expander(f"📈 Historique des {len(runs)} derniers runs", expanded=False):
+                        header = "| Heure | Scrappées | Analysées | Affaires |"
+                        sep    = "|---|---:|---:|---:|"
+                        rows   = [
+                            f"| `{run['heure']}` | {run['scrap']} | {run['anal']} "
+                            f"| {'✅ ' + str(run['affaires']) if run['affaires'] else '—'} |"
+                            for run in runs
+                        ]
+                        st.markdown("\n".join([header, sep] + rows))
+
+                st.divider()
                 st.markdown("### 📋 Journal de veille")
                 for l in (logs[:10] if logs else ["_Aucune affaire trouvée pour l'instant…_"]):
                     st.markdown(l)
-                st.caption(f"Prochain scan dans {intervalle} min · Dernier : {datetime.now().strftime('%H:%M:%S')}")
+                st.caption(f"Prochain scan dans {intervalle} min")
 
             _veille_fragment()
 
