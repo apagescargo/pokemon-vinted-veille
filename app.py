@@ -594,54 +594,41 @@ def main():
     mots_exclus_perm = load_mots_exclus_permanents()
 
     with st.sidebar:
-        st.header("🔍 Paramètres")
+        st.header("⚙️ Paramètres")
 
-        mode_rapide = st.toggle("⚡ Mode rapide (veille)", value=True,
-                                help="5 mots-clés génériques (~2 min) vs 86 mots-clés complets (~15 min)")
+        # ── Mots-clés cartes ──────────────────────────────────────────────────
+        mode_rapide = st.toggle("⚡ Mode rapide", value=True,
+                                help="5 mots-clés génériques (~2 min) vs 86 mots-clés (~15 min)")
         if mode_rapide:
-            st.caption("🟢 5 mots-clés · scan ~2 min")
             queries = ["pokemon", "lot pokemon", "collection pokemon", "vrac pokemon", "reverses pokemon"]
-            with st.expander("Mots-clés actifs"):
-                st.code("\n".join(queries))
+            st.caption(f"🟢 {len(queries)} mots-clés · ~2 min")
         else:
-            st.caption("🔵 86 mots-clés · scan ~15 min")
-            mots_cles_txt = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=150)
+            mots_cles_txt = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=120)
             queries       = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
-        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos,locandina,pubblicita,karte,deutsch,sammlung")
-        # Fusion sidebar + permanents (dédoublonnés)
-        mots_exclus = list({m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()} | set(mots_exclus_perm))
-        if mots_exclus_perm:
-            st.caption(f"🚫 Permanents : {', '.join(mots_exclus_perm)}")
-        seuil_max       = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
-        min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
-        filtre_date     = st.selectbox("Ancienneté max", list(LIMITES), index=1)
-        nb_resultats    = st.slider("Résultats max", 1, 20, 5)
+            st.caption(f"🔵 {len(queries)} mots-clés · ~15 min")
+
+        with st.expander("🚫 Mots exclus"):
+            mots_exclus_txt = st.text_input("Séparés par virgule",
+                value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos,locandina,pubblicita,karte,deutsch,sammlung",
+                label_visibility="collapsed")
+            mots_exclus = list({m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()} | set(mots_exclus_perm))
+            if mots_exclus_perm:
+                st.caption(f"Permanents : {', '.join(mots_exclus_perm)}")
 
         st.divider()
-        st.subheader("🗂️ Alertes Binders Vault X")
-        vault_on = st.toggle("Activer les alertes binders", value=False)
-        if vault_on:
-            vault_queries_txt = st.text_area(
-                "Mots-clés binders (un par ligne)",
-                value="vault x exo tec\nexo tec zip binder\nvault x binder\nvault x classeur\nbinder vault x pokemon",
-                height=100, key="vault_queries"
-            )
-            vault_queries   = [q.strip() for q in vault_queries_txt.splitlines() if q.strip()]
-            vault_inclus_txt = st.text_input("Mots obligatoires dans le titre (virgule)",
-                                             value="vault", key="vault_inclus",
-                                             help="Tous ces mots doivent être présents dans le titre")
-            vault_inclus    = [m.strip().lower() for m in vault_inclus_txt.split(",") if m.strip()]
-            vault_max_prix  = st.slider("Prix max par binder (€)", 5, 100, 18, 1,
-                                        format="%d€", key="vault_max_prix",
-                                        help=f"Neuf : 26,99 € — bonne affaire ≤ 18 €")
-            st.caption(f"Alerte si prix (ou prix/unité si lot) ≤ {vault_max_prix} € · neuf à 26,99 €")
-        else:
-            vault_queries, vault_inclus, vault_max_prix = [], [], 25
+
+        # ── Filtres cartes ────────────────────────────────────────────────────
+        seuil_max  = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
+        min_cartes = st.slider("Cartes minimum", 10, 4000, 300, 10)
+        filtre_date = st.selectbox("Ancienneté max", list(LIMITES), index=1)
 
         st.divider()
-        st.subheader("⏰ Mode veille")
-        intervalle = st.select_slider("Intervalle", options=[1, 2, 5, 10, 15, 30], value=5, format_func=lambda x: f"{x} min")
-        veille_on  = st.toggle("Activer la veille", value=st.session_state["veille_active"])
+
+        # ── Veille ────────────────────────────────────────────────────────────
+        st.subheader("⏰ Veille")
+        intervalle = st.select_slider("Intervalle", options=[1, 2, 5, 10, 15, 30], value=5,
+                                      format_func=lambda x: f"{x} min")
+        veille_on  = st.toggle("Activer", value=st.session_state["veille_active"])
         if veille_on != st.session_state["veille_active"]:
             st.session_state["veille_active"] = veille_on
             if veille_on:
@@ -649,10 +636,11 @@ def main():
             st.rerun()
 
         st.divider()
+
+        # ── Cache & actions ───────────────────────────────────────────────────
         nb_cache = len(st.session_state["analyse_cache"])
         nb_desc  = fetch_description.cache_info().currsize
-        st.caption(f"🚫 {len(blacklist)} masquée(s) · 🧠 {nb_cache} titres · 📄 {nb_desc} descriptions · 📨 {len(st.session_state['deja_notifies'])} notifiée(s)")
-
+        st.caption(f"🚫 {len(blacklist)} masquées · 🧠 {nb_cache} titres · 📄 {nb_desc} desc · 📨 {len(st.session_state['deja_notifies'])} notif.")
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🗑️ Blacklist", use_container_width=True):
@@ -667,6 +655,9 @@ def main():
                 st.rerun()
 
         lancer = st.button("🚀 Lancer la recherche", use_container_width=True, type="primary")
+
+    # Valeurs vault par défaut (surchargées dans le panneau de contrôle)
+    vault_queries, vault_inclus, vault_max_prix = [], ["vault"], 18
 
     tab1, tab2 = st.tabs(["🔍 Recherche & Veille", "📊 Analyse du marché"])
 
@@ -838,18 +829,31 @@ def main():
         pan_cartes, pan_binders = st.columns(2)
         with pan_cartes:
             cartes_actif = st.toggle(
-                f"🃏 Alertes Cartes {'· ' + ('⚡ rapide' if mode_rapide else '🔵 complet') }",
+                f"🃏 Alertes Cartes · {'⚡' if mode_rapide else '🔵'}",
                 value=True, key="pan_cartes",
-                help=f"{len(queries)} mots-clés · seuil {seuil_max:.2f}€/carte · min {min_cartes} cartes"
+                help=f"{len(queries)} mots-clés · ≤{seuil_max:.2f}€/carte · min {min_cartes} cartes"
             )
         with pan_binders:
-            binders_actif = st.toggle(
-                "🗂️ Alertes Binders Vault X",
-                value=vault_on, key="pan_binders",
-                help=f"Prix max {vault_max_prix}€/unité · {len(vault_queries)} mots-clés" if vault_queries else "Configurer dans la sidebar"
-            )
-            if binders_actif and not vault_on:
-                st.caption("⚠️ Active d'abord les binders dans la sidebar")
+            binders_actif = st.toggle("🗂️ Alertes Binders", value=False, key="pan_binders")
+
+        if binders_actif:
+            with st.expander("⚙️ Config Vault X — 9-Pocket Exo-Tec Zip Binder (26,99€ neuf)", expanded=True):
+                b1, b2 = st.columns([2, 1])
+                with b1:
+                    vault_queries_txt = st.text_area(
+                        "Mots-clés (un par ligne)",
+                        value="vault x exo tec\nexo tec zip binder\nvault x binder\nvault x classeur\nbinder vault x pokemon",
+                        height=90, key="vault_queries", label_visibility="collapsed"
+                    )
+                    vault_queries = [q.strip() for q in vault_queries_txt.splitlines() if q.strip()]
+                    vault_inclus_txt = st.text_input("Mots obligatoires (virgule)", value="vault",
+                                                     key="vault_inclus")
+                    vault_inclus = [m.strip().lower() for m in vault_inclus_txt.split(",") if m.strip()]
+                with b2:
+                    vault_max_prix = st.slider("Prix max/unité", 5, 60, 18, 1,
+                                               format="%d€", key="vault_max_prix")
+                    st.caption(f"Neuf : 26,99€\nBonne affaire\n≤ **{vault_max_prix}€**")
+
         st.divider()
 
         if st.session_state["veille_active"]:
@@ -894,7 +898,7 @@ def main():
                                     deja_notifies.discard(r["id"])
 
                     # ── Scan Vault X binders ───────────────────────────────────
-                    if binders_actif and vault_on and vault_queries:
+                    if binders_actif and vault_queries:
                         for r in scanner_produit(vault_queries, vault_max_prix, vault_inclus,
                                                  [], blacklist, deja_notifies):
                             with _NOTIFY_LOCK:
@@ -977,7 +981,7 @@ def main():
                         st.session_state["diag"]      = diag
 
                     # Scan binders Vault X en recherche manuelle
-                    if binders_actif and vault_on and vault_queries:
+                    if binders_actif and vault_queries:
                         with st.spinner("Scan binders Vault X…"):
                             st.session_state["resultats_vault"] = scanner_produit(
                                 vault_queries, vault_max_prix, vault_inclus,
