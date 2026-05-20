@@ -623,16 +623,18 @@ def main():
         if vault_on:
             vault_queries_txt = st.text_area(
                 "Mots-clés binders (un par ligne)",
-                value="vault x binder\nbinder vault pokemon\nvault x pokemon",
-                height=80, key="vault_queries"
+                value="vault x exo tec\nexo tec zip binder\nvault x binder\nvault x classeur\nbinder vault x pokemon",
+                height=100, key="vault_queries"
             )
             vault_queries   = [q.strip() for q in vault_queries_txt.splitlines() if q.strip()]
             vault_inclus_txt = st.text_input("Mots obligatoires dans le titre (virgule)",
-                                             value="vault", key="vault_inclus")
+                                             value="vault", key="vault_inclus",
+                                             help="Tous ces mots doivent être présents dans le titre")
             vault_inclus    = [m.strip().lower() for m in vault_inclus_txt.split(",") if m.strip()]
-            vault_max_prix  = st.slider("Prix max par binder (€)", 5, 100, 25, 1,
-                                        format="%d€", key="vault_max_prix")
-            st.caption(f"Alerte si prix (ou prix/unité si lot) ≤ {vault_max_prix} €")
+            vault_max_prix  = st.slider("Prix max par binder (€)", 5, 100, 18, 1,
+                                        format="%d€", key="vault_max_prix",
+                                        help=f"Neuf : 26,99 € — bonne affaire ≤ 18 €")
+            st.caption(f"Alerte si prix (ou prix/unité si lot) ≤ {vault_max_prix} € · neuf à 26,99 €")
         else:
             vault_queries, vault_inclus, vault_max_prix = [], [], 25
 
