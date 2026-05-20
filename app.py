@@ -372,6 +372,79 @@ def envoyer_discord(r: dict) -> bool:
         return False
 
 
+# ── Discord — alerte produit ───────────────────────────────────────────────────
+
+def envoyer_discord_produit(r: dict) -> bool:
+    if not DISCORD_WEBHOOK_URL:
+        return False
+    qte   = r.get("qte", 1)
+    pu    = r["prix"] / qte if qte > 1 else None
+    fields = [
+        {"name": "💰 Prix",       "value": f"{r['prix']:.2f} €", "inline": True},
+        {"name": "🕐 Ancienneté", "value": anciennete(r["created_at"]), "inline": True},
+    ]
+    if qte > 1:
+        fields.insert(1, {"name": "📦 Quantité", "value": str(qte), "inline": True})
+        fields.insert(2, {"name": "💡 Prix/unité", "value": f"{pu:.2f} €", "inline": True})
+    embed = {
+        "title":  r["titre"][:256],
+        "url":    r["url"],
+        "color":  0x5865f2,
+        "fields": fields,
+        "thumbnail": {"url": r["photo"]} if r.get("photo") else {},
+    }
+    try:
+        resp = requests.post(DISCORD_WEBHOOK_URL, json={"embeds": [embed]}, timeout=8)
+        return resp.status_code in (200, 204)
+    except Exception:
+        return False
+
+
+# ── Scanner produit (logique prix pur, pas de €/carte) ─────────────────────────
+
+_QTE_RE = re.compile(r"(?:lot\s+(?:de\s+)?|x\s*)(\d+)", re.I)
+
+def scanner_produit(queries_produit: list[str], max_prix: float,
+                    mots_inclus: list[str], mots_exclus_p: list[str],
+                    blacklist: set, deja_notifies: set) -> list[dict]:
+    """Scrape les queries produit et alerte si prix <= max_prix.
+    Détecte les lots (ex: 'lot de 3 binders') pour calculer le prix unitaire."""
+    resultats = []
+    all_items = []
+    for q in queries_produit:
+        all_items.extend(scrape_all_pages(q))
+
+    # Dédoublonnage par id
+    seen = set()
+    items_uniq = []
+    for a in all_items:
+        if a["id"] not in seen:
+            seen.add(a["id"])
+            items_uniq.append(a)
+
+    for a in items_uniq:
+        if a["id"] in blacklist or a["id"] in deja_notifies:
+            continue
+        if a["prix"] <= PRIX_MIN:
+            continue
+        if mots_inclus and not all(m in a["titre_low"] for m in mots_inclus):
+            continue
+        if mots_exclus_p and any(m in a["titre_low"] for m in mots_exclus_p):
+            continue
+        # Détection quantité pour prix unitaire
+        qte = 1
+        m = _QTE_RE.search(a["titre_low"])
+        if m:
+            q_val = int(m.group(1))
+            if 2 <= q_val <= 50:
+                qte = q_val
+        prix_unitaire = a["prix"] / qte
+        if prix_unitaire <= max_prix:
+            resultats.append({**a, "qte": qte, "prix_unitaire": prix_unitaire})
+
+    return resultats
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def anciennete(ts) -> str:
@@ -512,7 +585,7 @@ def main():
 
     for k, v in [("analyse_cache", {}), ("resultats", []), ("deja_notifies", set()),
                  ("veille_active", False), ("veille_log", []), ("analyse_history", []),
-                 ("veille_runs", [])]:
+                 ("veille_runs", []), ("resultats_vault", [])]:
         if k not in st.session_state:
             st.session_state[k] = v
 
@@ -543,6 +616,25 @@ def main():
         min_cartes      = st.slider("Cartes minimum", 10, 4000, 300, 10)
         filtre_date     = st.selectbox("Ancienneté max", list(LIMITES), index=1)
         nb_resultats    = st.slider("Résultats max", 1, 20, 5)
+
+        st.divider()
+        st.subheader("🗂️ Alertes Binders Vault X")
+        vault_on = st.toggle("Activer les alertes binders", value=False)
+        if vault_on:
+            vault_queries_txt = st.text_area(
+                "Mots-clés binders (un par ligne)",
+                value="vault x binder\nbinder vault pokemon\nvault x pokemon",
+                height=80, key="vault_queries"
+            )
+            vault_queries   = [q.strip() for q in vault_queries_txt.splitlines() if q.strip()]
+            vault_inclus_txt = st.text_input("Mots obligatoires dans le titre (virgule)",
+                                             value="vault", key="vault_inclus")
+            vault_inclus    = [m.strip().lower() for m in vault_inclus_txt.split(",") if m.strip()]
+            vault_max_prix  = st.slider("Prix max par binder (€)", 5, 100, 25, 1,
+                                        format="%d€", key="vault_max_prix")
+            st.caption(f"Alerte si prix (ou prix/unité si lot) ≤ {vault_max_prix} €")
+        else:
+            vault_queries, vault_inclus, vault_max_prix = [], [], 25
 
         st.divider()
         st.subheader("⏰ Mode veille")
@@ -780,6 +872,24 @@ def main():
                                 with _NOTIFY_LOCK:
                                     deja_notifies.discard(r["id"])
 
+                    # ── Scan Vault X binders ───────────────────────────────────
+                    if vault_on and vault_queries:
+                        for r in scanner_produit(vault_queries, vault_max_prix, vault_inclus,
+                                                 [], blacklist, deja_notifies):
+                            with _NOTIFY_LOCK:
+                                if r["id"] in deja_notifies:
+                                    continue
+                                deja_notifies.add(r["id"])
+                            ok = envoyer_discord_produit(r)
+                            if ok:
+                                bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
+                                affaires_run += 1
+                                pu_str = f" · {r['prix_unitaire']:.2f}€/unité" if r["qte"] > 1 else ""
+                                logs.insert(0, f"🗂️ {datetime.now().strftime('%H:%M:%S')} — **{r['titre'][:50]}** ({r['prix']:.2f}€{pu_str})")
+                            else:
+                                with _NOTIFY_LOCK:
+                                    deja_notifies.discard(r["id"])
+
                 # Résumé du run
                 total_scrap = sum(d["scrappees"] for d in diag_run)
                 total_anal  = sum(d["analysees"] for d in diag_run)
@@ -844,6 +954,14 @@ def main():
 
                     st.session_state["resultats"] = resultats
                     st.session_state["diag"]      = diag
+
+                    # Scan binders Vault X en recherche manuelle
+                    if vault_on and vault_queries:
+                        with st.spinner("Scan binders Vault X…"):
+                            st.session_state["resultats_vault"] = scanner_produit(
+                                vault_queries, vault_max_prix, vault_inclus,
+                                [], blacklist, set()
+                            )
 
             # ── Diagnostic ────────────────────────────────────────────────────
             if "diag" in st.session_state and st.session_state["diag"]:
@@ -932,6 +1050,45 @@ def main():
                                     st.toast(f"✅ « {mot_clean} » ajouté aux exclusions permanentes")
                                     st.rerun()
                         st.divider()
+
+            # ── Résultats Vault X binders ──────────────────────────────────────
+            resultats_vault = st.session_state.get("resultats_vault", [])
+            if resultats_vault:
+                st.markdown(f"### 🗂️ {len(resultats_vault)} binder(s) Vault X trouvé(s)")
+                for r in sorted(resultats_vault, key=lambda x: x["created_at"] or 0, reverse=True):
+                    if r["id"] in blacklist:
+                        continue
+                    qte    = r.get("qte", 1)
+                    pu     = r["prix_unitaire"]
+                    detail = f"📦 {qte} unités · 💡 {pu:.2f} €/unité" if qte > 1 else f"💡 {pu:.2f} €"
+                    col_photo, col_info, col_action = st.columns([1, 4, 1])
+                    with col_photo:
+                        if r["photo"]:
+                            st.image(r["photo"], width=120)
+                    with col_info:
+                        st.markdown(
+                            f"""<div style="border:2px solid #5865f2;background:#f0f2ff;border-radius:8px;padding:12px;">
+                                <span style="color:#888;font-size:.85em">🕐 {anciennete(r['created_at'])}</span><br>
+                                <b>{r['titre']}</b><br>
+                                💰 <b>{r['prix']:.2f} €</b> &nbsp;|&nbsp; {detail}<br>
+                                <a href="{r['url']}" target="_blank">🔗 Voir l'annonce</a>
+                            </div>""",
+                            unsafe_allow_html=True,
+                        )
+                    with col_action:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("📨 Discord", key=f"vault_discord_{r['id']}", use_container_width=True):
+                            ok = envoyer_discord_produit(r)
+                            if ok:
+                                bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
+                                st.toast("✅ Envoyé et masqué !")
+                                st.rerun()
+                            else:
+                                st.toast("❌ Échec de l'envoi.")
+                        if st.button("🚫 Masquer", key=f"vault_hide_{r['id']}", use_container_width=True):
+                            bl = load_blacklist(); bl.add(r["id"]); save_blacklist(bl)
+                            st.rerun()
+                    st.divider()
 
 
 if __name__ == "__main__":
