@@ -256,6 +256,8 @@ def _regex(texte: str) -> int:
         m = pat.search(t)
         if m:
             val = int(m.group(1))
+            if 1990 <= val <= 2030:  # année → pas un nombre de cartes
+                continue
             if 1 <= val <= 10000:
                 return val
     return 0
@@ -522,7 +524,7 @@ def main():
         st.header("🔍 Paramètres")
         mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
         queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
-        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos")
+        mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos,locandina,pubblicita,karte,deutsch,sammlung")
         # Fusion sidebar + permanents (dédoublonnés)
         mots_exclus = list({m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()} | set(mots_exclus_perm))
         if mots_exclus_perm:
