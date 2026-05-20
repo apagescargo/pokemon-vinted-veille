@@ -522,8 +522,18 @@ def main():
 
     with st.sidebar:
         st.header("🔍 Paramètres")
-        mots_cles_txt   = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=100)
-        queries         = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
+
+        mode_rapide = st.toggle("⚡ Mode rapide (veille)", value=True,
+                                help="5 mots-clés génériques (~2 min) vs 86 mots-clés complets (~15 min)")
+        if mode_rapide:
+            st.caption("🟢 5 mots-clés · scan ~2 min")
+            queries = ["pokemon", "lot pokemon", "collection pokemon", "vrac pokemon", "reverses pokemon"]
+            with st.expander("Mots-clés actifs"):
+                st.code("\n".join(queries))
+        else:
+            st.caption("🔵 86 mots-clés · scan ~15 min")
+            mots_cles_txt = st.text_area("Mots-clés (un par ligne)", value=MOTS_CLES_DEFAUT, height=150)
+            queries       = [q.strip() for q in mots_cles_txt.splitlines() if q.strip()]
         mots_exclus_txt = st.text_input("Mots exclus du titre (virgule)", value="japonaise,lotto,one piece,pyjama,japanese,giapponese,assassin,cartas,brinquedos,locandina,pubblicita,karte,deutsch,sammlung")
         # Fusion sidebar + permanents (dédoublonnés)
         mots_exclus = list({m.strip().lower() for m in mots_exclus_txt.split(",") if m.strip()} | set(mots_exclus_perm))
