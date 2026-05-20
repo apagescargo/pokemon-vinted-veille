@@ -713,7 +713,8 @@ def main():
                 with st.expander("🔬 Dernière analyse — détail par mot-clé", expanded=True):
                     def _fmt_ts(ts):
                         if ts is None: return "—"
-                        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%H:%M")
+                        from zoneinfo import ZoneInfo
+                        return datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Paris")).strftime("%H:%M")
 
                     header = "| Mot-clé | Scrappées | Analysées | Affaires | 🕐 Plus ancienne | 🕐 Plus récente |"
                     sep    = "|---|---:|---:|---:|---:|---:|"
@@ -728,7 +729,7 @@ def main():
                     total_f = sum(d["affaires"]  for d in diag_data)
                     rows.append(f"| **TOTAL** | **{total_s}** | **{total_a}** | **{'✅ ' + str(total_f) if total_f else '—'}** | | |")
                     st.markdown("\n".join([header, sep] + rows))
-                    st.caption("Heures en UTC — France = UTC+2 en été")
+                    st.caption("Heures en heure française (Europe/Paris)")
                     with st.expander("détail des exclusions"):
                         for d in diag_data:
                             st.markdown(
