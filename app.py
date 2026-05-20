@@ -916,32 +916,39 @@ def main():
                                     deja_notifies.discard(r["id"])
 
                 # Résumé du run
-                total_scrap = sum(d["scrappees"] for d in diag_run)
-                total_anal  = sum(d["analysees"] for d in diag_run)
-                run_entry   = {
+                total_scrap  = sum(d["scrappees"] for d in diag_run)
+                total_anal   = sum(d["analysees"] for d in diag_run)
+                total_uniq   = len(cache)  # taille réelle du cache = uniques analysées depuis démarrage
+                nouvelles    = total_uniq - runs[0].get("uniq", total_uniq) if runs else 0
+                run_entry    = {
                     "heure":    heure_run,
                     "scrap":    total_scrap,
                     "anal":     total_anal,
                     "affaires": affaires_run,
+                    "uniq":     total_uniq,
+                    "nouvelles": max(0, nouvelles),
                 }
                 runs.insert(0, run_entry)
-                st.session_state["veille_runs"] = runs[:20]  # 20 runs max
+                st.session_state["veille_runs"] = runs[:20]
                 st.session_state["veille_log"]  = logs[:50]
 
                 # ── Métriques du dernier run ───────────────────────────────────
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("🕐 Dernier scan", heure_run)
-                c2.metric("📡 Scrappées",    total_scrap)
-                c3.metric("🔍 Analysées",    total_anal)
-                c4.metric("✅ Affaires",     affaires_run)
+                c1, c2, c3, c4, c5 = st.columns(5)
+                c1.metric("🕐 Dernier scan",  heure_run)
+                c2.metric("📡 Scrappées",     total_scrap)
+                c3.metric("🔍 Ce run",        total_anal)
+                c4.metric("🆕 Uniques totales", total_uniq,
+                          delta=f"+{run_entry['nouvelles']}" if run_entry["nouvelles"] else None)
+                c5.metric("✅ Affaires",      affaires_run)
 
                 # ── Historique des runs ────────────────────────────────────────
                 if len(runs) > 1:
                     with st.expander(f"📈 Historique des {len(runs)} derniers runs", expanded=False):
-                        header = "| Heure | Scrappées | Analysées | Affaires |"
-                        sep    = "|---|---:|---:|---:|"
+                        header = "| Heure | Scrappées | Ce run | Uniques totales | Affaires |"
+                        sep    = "|---|---:|---:|---:|---:|"
                         rows   = [
                             f"| `{run['heure']}` | {run['scrap']} | {run['anal']} "
+                            f"| {run.get('uniq', '—')} "
                             f"| {'✅ ' + str(run['affaires']) if run['affaires'] else '—'} |"
                             for run in runs
                         ]
