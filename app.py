@@ -143,7 +143,7 @@ def _scrape_page_cached(query: str, page: int) -> tuple[list[dict], int]:
 def scrape_all_pages(query: str) -> list[dict]:
     """Scrape les pages en parallèle via _EXECUTOR_PAGES (pool dédié réseau).
     On sonde d'abord la page 1 pour connaître total_pages, puis on lance les suivantes."""
-    MAX_PROBE = 5  # Vinted retourne rarement plus de 3-4 pages utiles
+    MAX_PROBE = 10  # Vinted plafonne à 10 pages × 96 = 960 items max
 
     futures = {
         _EXECUTOR_PAGES.submit(_scrape_page_cached, query, p): p
