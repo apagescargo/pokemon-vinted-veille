@@ -46,7 +46,32 @@ LIMITES = {
     "Tout":           None,
 }
 
-MOTS_CLES_DEFAUT = "gros lot cartes pokemon\nlot vrac pokemon\ncollection pokemon\npokemon\nlot cartes pokemon\nreverses pokemon"
+MOTS_CLES_DEFAUT = (
+    # Génériques
+    "pokemon\n"
+    "lot pokemon\n"
+    "vrac pokemon\n"
+    "collection pokemon\n"
+    "reverses pokemon\n"
+    # Écarlate et Violet (série actuelle)
+    "lot ecarlate violet\n"
+    "lot EV pokemon\n"
+    # Épée et Bouclier
+    "lot epee bouclier\n"
+    "lot EB pokemon\n"
+    # Soleil et Lune
+    "lot soleil lune\n"
+    "lot SL pokemon\n"
+    # XY
+    "lot XY pokemon\n"
+    # Noir et Blanc
+    "lot noir blanc\n"
+    "lot NB pokemon\n"
+    # Diamant et Perle / Platine / HGSS
+    "lot diamant perle\n"
+    "lot platine pokemon\n"
+    "lot HGSS pokemon"
+)
 
 # Trois pools séparés — aucun nesting dans le même pool
 _EXECUTOR_QUERIES = ThreadPoolExecutor(max_workers=5)   # 1 thread par mot-clé
