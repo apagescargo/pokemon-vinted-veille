@@ -54,33 +54,35 @@ MOTS_CLES_DEFAUT = "\n".join([
     "collection pokemon",
     "reverses pokemon",
     # ── Méga-Évolution ────────────────────────────────────────────────────────
-    "lot MEG", "lot PFL", "lot ASC", "lot POR", "lot CRI", "lot PBL",
-    # ── Écarlate et Violet — séries ───────────────────────────────────────────
-    "lot ecarlate violet",
+    "lot MEG pokemon", "lot PFL pokemon", "lot ASC pokemon",
+    "lot POR pokemon", "lot CRI pokemon",
+    # supprimés (< 100 scrappées) : PBL
+    # ── Écarlate et Violet ────────────────────────────────────────────────────
+    "lot ecarlate violet pokemon",
     "lot EV pokemon",
-    # ── Écarlate et Violet — extensions ───────────────────────────────────────
-    "lot SVI", "lot PAL", "lot OBF", "lot MEW", "lot PAR", "lot PAF",
-    "lot TEF", "lot TWM", "lot SFA", "lot SCR", "lot SSP", "lot PRE",
-    "lot JTG", "lot DRI", "lot BLK", "lot WHT",
-    # ── Épée et Bouclier — séries ─────────────────────────────────────────────
-    "lot epee bouclier",
+    "lot SVI pokemon", "lot PAL pokemon", "lot OBF pokemon", "lot MEW pokemon",
+    "lot PAR pokemon", "lot PAF pokemon", "lot TEF pokemon", "lot TWM pokemon",
+    "lot SFA pokemon", "lot SCR pokemon", "lot SSP pokemon", "lot PRE pokemon",
+    "lot JTG pokemon", "lot DRI pokemon", "lot BLK pokemon", "lot WHT pokemon",
+    # ── Épée et Bouclier ──────────────────────────────────────────────────────
+    "lot epee bouclier pokemon",
     "lot EB pokemon",
-    # ── Épée et Bouclier — extensions ─────────────────────────────────────────
-    "lot SSH", "lot RCL", "lot DAA", "lot CPA", "lot VIV", "lot SHF",
-    "lot BST", "lot CRE", "lot EVS", "lot CEL", "lot FST", "lot BRS",
-    "lot ASR", "lot LOR", "lot SIT", "lot CRZ",
-    # ── Soleil et Lune — séries ───────────────────────────────────────────────
-    "lot soleil lune",
+    "lot RCL pokemon", "lot CPA pokemon", "lot VIV pokemon",
+    "lot CRE pokemon", "lot EVS pokemon", "lot CEL pokemon", "lot FST pokemon",
+    "lot BRS pokemon", "lot ASR pokemon", "lot LOR pokemon", "lot SIT pokemon",
+    "lot CRZ pokemon",
+    # supprimés (< 100 scrappées) : SSH, DAA, SHF, BST
+    # ── Soleil et Lune ────────────────────────────────────────────────────────
+    "lot soleil lune pokemon",
     "lot SL pokemon",
-    # ── Soleil et Lune — extensions ───────────────────────────────────────────
-    "lot SUM", "lot GRI", "lot BUS", "lot SLG", "lot CIN", "lot UPR",
-    "lot FLI", "lot CES", "lot DRM", "lot LOT", "lot TEU", "lot UNB",
-    "lot UNM", "lot HIF", "lot CEC",
-    # ── Séries plus anciennes ─────────────────────────────────────────────────
+    "lot SUM pokemon", "lot GRI pokemon", "lot BUS pokemon", "lot CIN pokemon",
+    "lot FLI pokemon", "lot CES pokemon", "lot LOT pokemon",
+    # supprimés (< 100 scrappées) : SLG, UPR, DRM, UNB, UNM, TEU, HIF, CEC
+    # ── Séries anciennes ──────────────────────────────────────────────────────
     "lot XY pokemon",
-    "lot noir blanc",
+    "lot noir blanc pokemon",
     "lot NB pokemon",
-    "lot diamant perle",
+    "lot diamant perle pokemon",
     "lot platine pokemon",
     "lot HGSS pokemon",
 ])
