@@ -46,32 +46,44 @@ LIMITES = {
     "Tout":           None,
 }
 
-MOTS_CLES_DEFAUT = (
-    # Génériques
-    "pokemon\n"
-    "lot pokemon\n"
-    "vrac pokemon\n"
-    "collection pokemon\n"
-    "reverses pokemon\n"
-    # Écarlate et Violet (série actuelle)
-    "lot ecarlate violet\n"
-    "lot EV pokemon\n"
-    # Épée et Bouclier
-    "lot epee bouclier\n"
-    "lot EB pokemon\n"
-    # Soleil et Lune
-    "lot soleil lune\n"
-    "lot SL pokemon\n"
-    # XY
-    "lot XY pokemon\n"
-    # Noir et Blanc
-    "lot noir blanc\n"
-    "lot NB pokemon\n"
-    # Diamant et Perle / Platine / HGSS
-    "lot diamant perle\n"
-    "lot platine pokemon\n"
-    "lot HGSS pokemon"
-)
+MOTS_CLES_DEFAUT = "\n".join([
+    # ── Génériques ────────────────────────────────────────────────────────────
+    "pokemon",
+    "lot pokemon",
+    "vrac pokemon",
+    "collection pokemon",
+    "reverses pokemon",
+    # ── Méga-Évolution ────────────────────────────────────────────────────────
+    "lot MEG", "lot PFL", "lot ASC", "lot POR", "lot CRI", "lot PBL",
+    # ── Écarlate et Violet — séries ───────────────────────────────────────────
+    "lot ecarlate violet",
+    "lot EV pokemon",
+    # ── Écarlate et Violet — extensions ───────────────────────────────────────
+    "lot SVI", "lot PAL", "lot OBF", "lot MEW", "lot PAR", "lot PAF",
+    "lot TEF", "lot TWM", "lot SFA", "lot SCR", "lot SSP", "lot PRE",
+    "lot JTG", "lot DRI", "lot BLK", "lot WHT",
+    # ── Épée et Bouclier — séries ─────────────────────────────────────────────
+    "lot epee bouclier",
+    "lot EB pokemon",
+    # ── Épée et Bouclier — extensions ─────────────────────────────────────────
+    "lot SSH", "lot RCL", "lot DAA", "lot CPA", "lot VIV", "lot SHF",
+    "lot BST", "lot CRE", "lot EVS", "lot CEL", "lot FST", "lot BRS",
+    "lot ASR", "lot LOR", "lot SIT", "lot CRZ",
+    # ── Soleil et Lune — séries ───────────────────────────────────────────────
+    "lot soleil lune",
+    "lot SL pokemon",
+    # ── Soleil et Lune — extensions ───────────────────────────────────────────
+    "lot SUM", "lot GRI", "lot BUS", "lot SLG", "lot CIN", "lot UPR",
+    "lot FLI", "lot CES", "lot DRM", "lot LOT", "lot TEU", "lot UNB",
+    "lot UNM", "lot HIF", "lot CEC",
+    # ── Séries plus anciennes ─────────────────────────────────────────────────
+    "lot XY pokemon",
+    "lot noir blanc",
+    "lot NB pokemon",
+    "lot diamant perle",
+    "lot platine pokemon",
+    "lot HGSS pokemon",
+])
 
 # Trois pools séparés — aucun nesting dans le même pool
 _EXECUTOR_QUERIES = ThreadPoolExecutor(max_workers=5)   # 1 thread par mot-clé
