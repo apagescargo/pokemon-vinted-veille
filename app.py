@@ -328,12 +328,6 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
     maintenant = datetime.now(timezone.utc)
     all_items  = scrape_all_pages(query)
 
-    # Timestamps min/max sur toutes les annonces scrappées
-    ts_valides = [a["created_at"] for a in all_items if a["created_at"]]
-    ts_min = min(ts_valides) if ts_valides else None
-    ts_max = max(ts_valides) if ts_valides else None
-
-    # Fix #4 : blacklist chargée une seule fois (passée en param), pas relue ici
     # Pré-filtre O(N) CPU pur — utilise titre_low précalculé (fix #5)
     a_analyser, exclu_date, exclu_bl, exclu_mots, exclu_prix = [], 0, 0, 0, 0
     for a in all_items:
@@ -350,6 +344,11 @@ def scanner_query(query: str, seuil_max: float, min_cartes: int, limite: timedel
         if min_cartes > 0 and a["prix"] / min_cartes > seuil_max:
             exclu_prix += 1; continue
         a_analyser.append(a)
+
+    # Timestamps min/max sur les annonces effectivement analysées (après filtres)
+    ts_valides = [a["created_at"] for a in a_analyser if a["created_at"]]
+    ts_min = min(ts_valides) if ts_valides else None
+    ts_max = max(ts_valides) if ts_valides else None
 
     nb_map = analyse_batch(a_analyser, cache, seuil_max, min_cartes)
 
@@ -770,7 +769,7 @@ def main():
                         from zoneinfo import ZoneInfo
                         return datetime.fromtimestamp(ts, tz=ZoneInfo("Europe/Paris")).strftime("%H:%M")
 
-                    header = "| Mot-clé | Scrappées | Analysées | Affaires | 🕐 Plus ancienne | 🕐 Plus récente |"
+                    header = "| Mot-clé | Scrappées | Analysées | Affaires | 🕐 Analysée la + ancienne | 🕐 Analysée la + récente |"
                     sep    = "|---|---:|---:|---:|---:|---:|"
                     rows   = [
                         f"| `{d['query']}` | {d['scrappees']} | {d['analysees']} "
