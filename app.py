@@ -618,7 +618,7 @@ def main():
         st.divider()
 
         # ── Filtres cartes ────────────────────────────────────────────────────
-        seuil_max  = st.slider("Seuil max €/carte", 0.01, 0.50, 0.04, 0.01, format="%.2f€")
+        seuil_max  = st.slider("Seuil max €/carte", 0.01, 0.50, 0.06, 0.01, format="%.2f€")
         min_cartes = st.slider("Cartes minimum", 10, 4000, 300, 10)
         filtre_date = st.selectbox("Ancienneté max", list(LIMITES), index=1)
 
@@ -626,7 +626,7 @@ def main():
 
         # ── Veille ────────────────────────────────────────────────────────────
         st.subheader("⏰ Veille")
-        intervalle = st.select_slider("Intervalle", options=[1, 2, 5, 10, 15, 30], value=5,
+        intervalle = st.select_slider("Intervalle", options=[1, 2, 5, 10, 15, 30], value=2,
                                       format_func=lambda x: f"{x} min")
         veille_on  = st.toggle("Activer", value=st.session_state["veille_active"])
         if veille_on != st.session_state["veille_active"]:
