@@ -253,13 +253,12 @@ _PATTERNS = [
 def _regex(texte: str) -> int:
     t = _CARD_REF.sub("", texte)
     for pat in _PATTERNS:
-        m = pat.search(t)
-        if m:
-            val = int(m.group(1))
-            if 1990 <= val <= 2030:  # année → pas un nombre de cartes
-                continue
-            if 1 <= val <= 10000:
-                return val
+        vals = [
+            int(v) for v in pat.findall(t)
+            if 1 <= int(v) <= 10000 and not (1990 <= int(v) <= 2030)
+        ]
+        if vals:
+            return sum(vals)  # somme tous les nombres valides du pattern
     return 0
 
 _LD_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.DOTALL)
@@ -663,8 +662,7 @@ def main():
 
     # ── Onglet Analyse ─────────────────────────────────────────────────────────
     with tab2:
-        st.info("⏸️ Analyse du marché désactivée temporairement (optimisation en cours).")
-        # @st.fragment(run_every=60)
+        @st.fragment(run_every=60)
         def _onglet_analyse():
             with st.spinner("Chargement des 100 dernières annonces…"):
                 items = scrape_all_pages("pokemon")[:100]
